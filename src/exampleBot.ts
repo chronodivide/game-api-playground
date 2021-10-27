@@ -6,12 +6,14 @@ enum BotState {
     Attacking
 }
 
-function main() {
+async function main() {
     const mapName = "mp03t4.map";
     const botName = "Agent 1";
     const otherBotName = "Agent 2";
 
-    const game = cdapi.createGame({
+    await cdapi.init(process.env.MIX_DIR || "./");
+
+    const game = await cdapi.createGame({
         agents: [{ name: botName, country: 0 }, { name: otherBotName, country: 5 }],
         buildOffAlly: false,
         cratesAppear: false,
@@ -72,4 +74,4 @@ function main() {
     game.saveReplay();
 }
 
-main();
+main().catch(e => console.error(e));

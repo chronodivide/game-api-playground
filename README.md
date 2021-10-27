@@ -11,5 +11,5 @@ npm start
 ## Debugging
 
 ```sh
-npx cross-env NODE_OPTIONS="--inspect" npm start
+npx cross-env MIX_DIR="C:\path_to_ra2_install_dir" NODE_OPTIONS="--inspect" npm start
 ```
