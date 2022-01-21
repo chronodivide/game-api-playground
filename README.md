@@ -5,7 +5,7 @@
 ```sh
 npm install
 npm run build
-npm start
+npx cross-env MIX_DIR="C:\path_to_ra2_install_dir" npm start
 ```
 
 ## Debugging
