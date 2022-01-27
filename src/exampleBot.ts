@@ -8,12 +8,17 @@ enum BotState {
 
 async function main() {
     const mapName = "mp03t4.map";
-    const botName = "Agent 1";
-    const otherBotName = "Agent 2";
+    // Bot names must be unique in online mode
+    const botName = `Agent${String(Date.now()).substr(-6)}`;
+    const otherBotName = `Agent${String(Date.now() + 1).substr(-6)}`;
 
     await cdapi.init(process.env.MIX_DIR || "./");
 
     const game = await cdapi.createGame({
+        // Uncomment the following lines to play in real time versus the bot
+        // online: true,
+        // serverUrl: process.env.SERVER_URL!,
+        // clientUrl: process.env.CLIENT_URL!,
         agents: [{ name: botName, country: 0 }, { name: otherBotName, country: 5 }],
         buildOffAlly: false,
         cratesAppear: false,
@@ -68,10 +73,17 @@ async function main() {
                     break;
             }
         }
+        // Use the following line in offline mode
         game.tick();
+        // Use the following line in online mode
+        // await game.waitForTick();
     }
 
     game.saveReplay();
+    game.dispose();
 }
 
-main().catch(e => console.error(e));
+main().catch(e => {
+    console.error(e);
+    process.exit(1);
+});
