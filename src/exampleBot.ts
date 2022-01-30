@@ -59,8 +59,7 @@ async function main() {
 
                 case BotState.Deployed: {
                     const armyUnits = game.getVisibleUnits(botName, "self", r => r.isSelectableCombatant);
-                    const enemyStartLocation = game.getPlayerData(otherBotName).startLocation;
-                    const { x: rx, y: ry } = game.map.getStartingLocations()[enemyStartLocation];
+                    const { x: rx, y: ry } = game.getPlayerData(otherBotName).startLocation;
                     game.actions.setPlayer(botName).orderUnits(armyUnits, OrderType.AttackMove, rx, ry);
                     botState = BotState.Attacking;
                     break;
