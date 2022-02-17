@@ -1,9 +1,83 @@
-import { cdapi, OrderType } from "@chronodivide/game-api";
+import { cdapi, OrderType, ApiEventType, Bot, GameApi, ApiEvent } from "@chronodivide/game-api";
 
 enum BotState {
     Initial,
     Deployed,
-    Attacking
+    Attacking,
+    Defeated
+}
+
+class ExampleBot extends Bot {
+    private botState = BotState.Initial;
+    private tickRatio!: number;
+    private enemyPlayers!: string[];
+
+    override onGameStart(game: GameApi) {
+        const tickMillis = game.getTickMillis();
+        const gameRate = 1000 / tickMillis;
+        const botApm = 300;
+        const botRate = botApm / 60;
+        this.tickRatio = Math.ceil(gameRate / botRate);
+
+        this.enemyPlayers = game.getPlayers().filter(p => p !== this.name && !game.areAlliedPlayers(this.name, p));
+    }
+
+    override onGameTick(game: GameApi) {
+        if (game.getCurrentTick() % this.tickRatio === 0) {
+            switch (this.botState) {
+                case BotState.Initial: {
+                    const baseUnits = game.getGeneralRules().baseUnit;
+                    let conYards = game.getVisibleUnits(this.name, "self", r => r.constructionYard);
+                    if (conYards.length) {
+                        this.botState = BotState.Deployed;
+                        break;
+                    }
+                    const units = game.getVisibleUnits(this.name, "self", r => baseUnits.includes(r.name));
+                    if (units.length) {
+                        this.actions.orderUnits([units[0]], OrderType.DeploySelected);
+                    }
+                    break;
+                }
+
+                case BotState.Deployed: {
+                    const armyUnits = game.getVisibleUnits(this.name, "self", r => r.isSelectableCombatant);
+                    const { x: rx, y: ry } = game.getPlayerData(this.enemyPlayers[0]).startLocation;
+                    this.actions.orderUnits(armyUnits, OrderType.AttackMove, rx, ry);
+                    this.botState = BotState.Attacking;
+                    break;
+                }
+
+                case BotState.Attacking: {
+                    const armyUnits = game.getVisibleUnits(this.name, "self", r => r.isSelectableCombatant);
+                    if (!armyUnits.length) {
+                        this.botState = BotState.Defeated;
+                        this.actions.quitGame();
+                    }
+                    break;
+                }
+
+                default:
+                    break;
+            }
+        }
+    }
+
+    override onGameEvent(ev: ApiEvent) {
+        switch (ev.type) {
+            case ApiEventType.ObjectOwnerChange: {
+                console.log(`[${this.name}] Owner change: ${ev.prevOwnerName} -> ${ev.newOwnerName}`);
+                break;
+            }
+
+            case ApiEventType.ObjectDestroy: {
+                console.log(`[${this.name}] Object destroyed: ${ev.target}`);
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
 }
 
 async function main() {
@@ -19,7 +93,8 @@ async function main() {
         // online: true,
         // serverUrl: process.env.SERVER_URL!,
         // clientUrl: process.env.CLIENT_URL!,
-        agents: [{ name: botName, country: 0 }, { name: otherBotName, country: 5 }],
+        // agents: [new ExampleBot(botName, 0), { name: otherBotName, country: 5 }],
+        agents: [new ExampleBot(botName, 0), new ExampleBot(otherBotName, 5)],
         buildOffAlly: false,
         cratesAppear: false,
         credits: 10000,
@@ -32,46 +107,7 @@ async function main() {
         unitCount: 10
     });
 
-    const tickMillis = game.getTickMillis();
-    const gameRate = 1000 / tickMillis;
-    const botApm = 300;
-    const botRate = botApm / 60;
-    const tickRatio = Math.ceil(gameRate / botRate);
-
-    let botState = BotState.Initial;
-
     while (!game.isFinished()) {
-        if (game.getCurrentTick() % tickRatio === 0) {
-            switch (botState) {
-                case BotState.Initial: {
-                    const baseUnits = game.getGeneralRules().baseUnit;
-                    let conYards = game.getVisibleUnits(botName, "self", r => r.constructionYard);
-                    if (conYards.length) {
-                        botState = BotState.Deployed;
-                        break;
-                    }
-                    const units = game.getVisibleUnits(botName, "self", r => baseUnits.includes(r.name));
-                    if (units.length) {
-                        game.actions.setPlayer(botName).orderUnits([units[0]], OrderType.DeploySelected);
-                    }
-                    break;
-                }
-
-                case BotState.Deployed: {
-                    const armyUnits = game.getVisibleUnits(botName, "self", r => r.isSelectableCombatant);
-                    const { x: rx, y: ry } = game.getPlayerData(otherBotName).startLocation;
-                    game.actions.setPlayer(botName).orderUnits(armyUnits, OrderType.AttackMove, rx, ry);
-                    botState = BotState.Attacking;
-                    break;
-                }
-
-                case BotState.Attacking:
-                    break;
-
-                default:
-                    break;
-            }
-        }
         // Use the following line in offline mode
         game.tick();
         // Use the following line in online mode
