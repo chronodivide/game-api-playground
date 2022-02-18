@@ -34,7 +34,7 @@ class ExampleBot extends Bot {
                     }
                     const units = game.getVisibleUnits(this.name, "self", r => baseUnits.includes(r.name));
                     if (units.length) {
-                        this.actions.orderUnits([units[0]], OrderType.DeploySelected);
+                        this.actionsApi.orderUnits([units[0]], OrderType.DeploySelected);
                     }
                     break;
                 }
@@ -42,7 +42,7 @@ class ExampleBot extends Bot {
                 case BotState.Deployed: {
                     const armyUnits = game.getVisibleUnits(this.name, "self", r => r.isSelectableCombatant);
                     const { x: rx, y: ry } = game.getPlayerData(this.enemyPlayers[0]).startLocation;
-                    this.actions.orderUnits(armyUnits, OrderType.AttackMove, rx, ry);
+                    this.actionsApi.orderUnits(armyUnits, OrderType.AttackMove, rx, ry);
                     this.botState = BotState.Attacking;
                     break;
                 }
@@ -51,7 +51,7 @@ class ExampleBot extends Bot {
                     const armyUnits = game.getVisibleUnits(this.name, "self", r => r.isSelectableCombatant);
                     if (!armyUnits.length) {
                         this.botState = BotState.Defeated;
-                        this.actions.quitGame();
+                        this.actionsApi.quitGame();
                     }
                     break;
                 }
@@ -108,10 +108,7 @@ async function main() {
     });
 
     while (!game.isFinished()) {
-        // Use the following line in offline mode
-        game.tick();
-        // Use the following line in online mode
-        // await game.waitForTick();
+        await game.update();
     }
 
     game.saveReplay();
