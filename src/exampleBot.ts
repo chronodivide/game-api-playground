@@ -13,8 +13,7 @@ class ExampleBot extends Bot {
     private enemyPlayers!: string[];
 
     override onGameStart(game: GameApi) {
-        const tickMillis = game.getTickMillis();
-        const gameRate = 1000 / tickMillis;
+        const gameRate = game.getTickRate();
         const botApm = 300;
         const botRate = botApm / 60;
         this.tickRatio = Math.ceil(gameRate / botRate);
@@ -93,8 +92,8 @@ async function main() {
         // online: true,
         // serverUrl: process.env.SERVER_URL!,
         // clientUrl: process.env.CLIENT_URL!,
-        // agents: [new ExampleBot(botName, 0), { name: otherBotName, country: 5 }],
-        agents: [new ExampleBot(botName, 0), new ExampleBot(otherBotName, 5)],
+        // agents: [new ExampleBot(botName, "Americans"), { name: otherBotName, country: "French" }],
+        agents: [new ExampleBot(botName, "Americans"), new ExampleBot(otherBotName, "French")],
         buildOffAlly: false,
         cratesAppear: false,
         credits: 10000,
