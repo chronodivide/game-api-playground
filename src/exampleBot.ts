@@ -51,6 +51,16 @@ class ExampleBot extends Bot {
                     if (!armyUnits.length) {
                         this.botState = BotState.Defeated;
                         this.actionsApi.quitGame();
+                    } else {
+                        const enemyConYards = game.getVisibleUnits(this.name, "hostile", r => r.constructionYard);
+                        if (enemyConYards.length) {
+                            for (const unitId of armyUnits) {
+                                const unit = game.getUnitData(unitId);
+                                if (unit?.isIdle) {
+                                    this.actionsApi.orderUnits([unitId], OrderType.Attack, enemyConYards[0]);
+                                }
+                            }
+                        }
                     }
                     break;
                 }
