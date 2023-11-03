@@ -1,9 +1,10 @@
-import { cdapi, OrderType, ApiEventType, Bot, GameApi, ApiEvent } from "@chronodivide/game-api";
+import { cdapi, OrderType, ApiEventType, Bot, GameApi, ApiEvent, CreateBaseOpts, CreateOpts } from "@chronodivide/game-api";
 
 enum BotState {
     Initial,
     Deployed,
-    Attacking,
+    MovingToEnemy,
+    AttackingEnemy,
     Defeated
 }
 
@@ -42,24 +43,27 @@ class ExampleBot extends Bot {
                     const armyUnits = game.getVisibleUnits(this.name, "self", r => r.isSelectableCombatant);
                     const { x: rx, y: ry } = game.getPlayerData(this.enemyPlayers[0]).startLocation;
                     this.actionsApi.orderUnits(armyUnits, OrderType.AttackMove, rx, ry);
-                    this.botState = BotState.Attacking;
+                    this.botState = BotState.MovingToEnemy;
                     break;
                 }
 
-                case BotState.Attacking: {
+                case BotState.MovingToEnemy:
+                case BotState.AttackingEnemy: {
                     const armyUnits = game.getVisibleUnits(this.name, "self", r => r.isSelectableCombatant);
                     if (!armyUnits.length) {
                         this.botState = BotState.Defeated;
                         this.actionsApi.quitGame();
-                    } else {
-                        const enemyConYards = game.getVisibleUnits(this.name, "hostile", r => r.constructionYard);
-                        if (enemyConYards.length) {
-                            for (const unitId of armyUnits) {
-                                const unit = game.getUnitData(unitId);
-                                if (unit?.isIdle) {
-                                    this.actionsApi.orderUnits([unitId], OrderType.Attack, enemyConYards[0]);
-                                }
-                            }
+                        break;
+                    }
+
+                    if (this.botState === BotState.MovingToEnemy) {
+                        const baseUnits = game.getGeneralRules().baseUnit;
+                        const enemyBase = game.getVisibleUnits(this.name, "hostile",
+                            r => r.constructionYard || baseUnits.includes(r.name));
+
+                        if (enemyBase.length) {
+                            this.actionsApi.orderUnits(armyUnits, OrderType.AttackMove, enemyBase[0]);
+                            this.botState = BotState.AttackingEnemy;
                         }
                     }
                     break;
@@ -74,12 +78,12 @@ class ExampleBot extends Bot {
     override onGameEvent(ev: ApiEvent) {
         switch (ev.type) {
             case ApiEventType.ObjectOwnerChange: {
-                console.log(`[${this.name}] Owner change: ${ev.prevOwnerName} -> ${ev.newOwnerName}`);
+                this.logger.info(`Owner change: ${ev.prevOwnerName} -> ${ev.newOwnerName}`);
                 break;
             }
 
             case ApiEventType.ObjectDestroy: {
-                console.log(`[${this.name}] Object destroyed: ${ev.target}`);
+                this.logger.info(`Object destroyed: ${ev.target}`);
                 break;
             }
 
@@ -90,20 +94,11 @@ class ExampleBot extends Bot {
 }
 
 async function main() {
-    const mapName = "mp03t4.map";
-    // Bot names must be unique in online mode
-    const botName = `Agent${String(Date.now()).substr(-6)}`;
-    const otherBotName = `Agent${String(Date.now() + 1).substr(-6)}`;
-
     await cdapi.init(process.env.MIX_DIR || "./");
 
-    const game = await cdapi.createGame({
-        // Uncomment the following lines to play in real time versus the bot
-        // online: true,
-        // serverUrl: process.env.SERVER_URL!,
-        // clientUrl: process.env.CLIENT_URL!,
-        // agents: [new ExampleBot(botName, "Americans"), { name: otherBotName, country: "French" }],
-        agents: [new ExampleBot(botName, "Americans"), new ExampleBot(otherBotName, "French")],
+    const mapName = "mp03t4.map";
+
+    const baseOpts: CreateBaseOpts = {
         buildOffAlly: false,
         cratesAppear: false,
         credits: 10000,
@@ -114,7 +109,39 @@ async function main() {
         shortGame: true,
         superWeapons: false,
         unitCount: 10
-    });
+    };
+    let opts: CreateOpts;
+
+    const onlineMode = !!process.env.SERVER_URL;
+    if (onlineMode) {
+        const botName = process.env.BOT_USER;
+        if (!botName) {
+            throw new Error(`Missing env BOT_USER`);
+        }
+        const botPassword = process.env.BOT_PASS;
+        if (!botPassword) {
+            throw new Error(`Missing env BOT_PASS`);
+        }
+        const playerName = process.env.PLAYER_USER;
+        if (!playerName) {
+            throw new Error(`Missing env PLAYER_USER`);
+        }
+        opts = {
+            ...baseOpts,
+            online: true,
+            serverUrl: process.env.SERVER_URL!,
+            clientUrl: process.env.CLIENT_URL!,
+            botPassword,
+            agents: [new ExampleBot(botName, "Americans").setDebugMode(true), { name: playerName, country: "Africans" }]
+        };
+    } else {
+        opts = {
+            ...baseOpts,
+            agents: [new ExampleBot("Joe", "Americans").setDebugMode(true), new ExampleBot("Bob", "Africans")]
+        };
+    }
+
+    const game = await cdapi.createGame(opts);
 
     while (!game.isFinished()) {
         await game.update();
