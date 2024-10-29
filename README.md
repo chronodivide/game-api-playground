@@ -4,8 +4,8 @@ This is a sample project that uses the [Chrono Divide Game API](https://www.npmj
 
 ## Prerequisites
 
-* NodeJS 14+
-* TypeScript 4.3.5+
+* NodeJS 20+
+* TypeScript 4.8.4+
 * MIX files from an original RA2 installation
 
 ## Install instructions
